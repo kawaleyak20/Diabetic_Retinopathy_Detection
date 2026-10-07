@@ -14,3 +14,5 @@ data/
 .ipynb_checkpoints/
 runner.py
 project_paths.py
+reference_papers/*
+__pycache__/*
