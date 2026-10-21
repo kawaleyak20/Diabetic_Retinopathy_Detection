@@ -11,8 +11,7 @@
 /dataSources.local.xml
 api_token_kaggle.txt
 data/
-.ipynb_checkpoints/
-runner.py
-project_paths.py
 reference_papers/*
-__pycache__/*
+*/__pycache__/*
+.ipynb_checkpoints/
+models/*
