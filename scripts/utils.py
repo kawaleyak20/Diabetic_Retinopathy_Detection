@@ -121,8 +121,20 @@ def find_latest_resumable_run(model_name):
             "for a fresh run, or inspect this run before continuing."
         )
 
+    metadata = load_json(paths["metadata_path"])
+    if metadata.get("run_id") != run_id:
+        raise ValueError(
+            f"The newest run folder is {run_id}, but its metadata identifies "
+            f"{metadata.get('run_id')!r}. Inspect the run before resuming."
+        )
+    if metadata.get("model_name") != model_name:
+        raise ValueError(
+            f"The newest run folder is under model {model_name!r}, but its metadata "
+            f"identifies {metadata.get('model_name')!r}. Inspect the run before resuming."
+        )
+
     paths["latest_checkpoint"] = latest_checkpoint
-    paths["metadata"] = load_json(paths["metadata_path"])
+    paths["metadata"] = metadata
     return paths
 
 def list_model_runs(model_name):

@@ -1,0 +1,62 @@
+{
+  "model_name": "densenet",
+  "experiment": "class-weighted DenseNet121 comparison",
+  "architecture": "DenseNet121",
+  "run_id": "run_001",
+  "status": "completed",
+  "created_at": "2026-10-24T04:35:42+05:30",
+  "updated_at": "2026-10-24T11:21:28+05:30",
+  "dataset": "diabetic_retinopathy_detection",
+  "dataset_format": "btgraham-300",
+  "input_size": [
+    300,
+    300,
+    3
+  ],
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "pretrained_weights": "imagenet",
+  "backbone_trainable": false,
+  "preprocessing": "tf.keras.applications.densenet.preprocess_input inside model",
+  "dropout_rate": 0.3,
+  "optimizer": "Adam",
+  "learning_rate": 0.001,
+  "loss": "SparseCategoricalCrossentropy with training sample weights",
+  "training_metric": "SparseCategoricalAccuracy (unweighted reporting metric)",
+  "classification_head": "GlobalAveragePooling2D -> Dropout -> Dense(5, softmax)",
+  "batch_size": 4,
+  "batch_sizes_used": [
+    4
+  ],
+  "seed": 42,
+  "class_weighting": "balanced inverse-frequency: N / (K * n_c), training split only",
+  "training_class_counts": [
+    25810,
+    2443,
+    5292,
+    873,
+    708
+  ],
+  "class_weights": [
+    0.27218907400232467,
+    2.875644699140401,
+    1.3275132275132275,
+    8.047193585337915,
+    9.922598870056497
+  ],
+  "validation_loss_weighting": "none",
+  "test_split_used_for_weight_calculation": false,
+  "target_epochs": 50,
+  "last_completed_epoch": 50,
+  "best_val_loss": 0.9486757516860962,
+  "checkpoint_dir": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\densenet\\checkpoints\\run_001",
+  "best_model_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\densenet\\runs\\run_001\\best_model.weights.h5",
+  "training_history_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\densenet\\runs\\run_001\\training_history.csv",
+  "last_checkpoint": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\densenet\\checkpoints\\run_001\\ckpt-50",
+  "best_model_format": "keras_weights_hdf5"
+}

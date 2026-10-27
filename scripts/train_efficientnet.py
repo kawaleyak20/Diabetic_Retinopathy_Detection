@@ -36,7 +36,6 @@ from scripts.utils import (
     timestamp_now,
 )
 
-
 def build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS):
     """Create a frozen EfficientNetB0 feature extractor and five-class head.
 
@@ -173,6 +172,7 @@ def train_efficientnet(
     epochs=DEFAULT_TARGET_EPOCHS,
     seed=SEED,
     allow_cpu=False,
+    learning_rate = 0
 ):
     """Start a new run or resume the newest checkpointed EfficientNet run.
 
@@ -180,6 +180,8 @@ def train_efficientnet(
     CPU training is blocked by default while TensorFlow cannot see a GPU; pass
     allow_cpu=True only when deliberately accepting potentially very slow training.
     """
+    if learning_rate != 0 :
+        EFFICIENTNET_LEARNING_RATE = learning_rate
     run_mode = str(run_mode).strip().lower()
     if run_mode not in {"scratch", "resume"}:
         raise ValueError("run_mode must be 'scratch' or 'resume'")
@@ -238,8 +240,10 @@ def train_efficientnet(
         metadata["updated_at"] = timestamp_now()
 
     try:
-        # ImageNet weights are downloaded only if they are not already cached.
-        model = build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS)
+        # Scratch starts from ImageNet weights. Resume restores every model weight
+        # from the local recovery checkpoint, so it must not depend on a download.
+        initial_weights = EFFICIENTNET_WEIGHTS if run_mode == "scratch" else None
+        model = build_efficientnet_model(weights=initial_weights)
 
         completed_epoch = tf.Variable(0, dtype=tf.int64, trainable=False, name="completed_epoch")
         best_val_loss = tf.Variable(float("inf"), dtype=tf.float32, trainable=False, name="best_val_loss")

@@ -1,0 +1,49 @@
+{
+  "model_name": "fusion",
+  "experiment": "EfficientNetB0 + DenseNet121 feature fusion",
+  "architecture": "EfficientNetB0 + DenseNet121 late feature fusion",
+  "run_id": "run_001",
+  "status": "completed",
+  "created_at": "2026-10-24T11:36:44+05:30",
+  "updated_at": "2026-10-24T17:20:20+05:30",
+  "dataset": "diabetic_retinopathy_detection",
+  "dataset_format": "btgraham-300",
+  "input_size": [
+    300,
+    300,
+    3
+  ],
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "pretrained_weights": "imagenet for both branches",
+  "backbones_trainable": false,
+  "fusion_method": "concatenate global-average-pooled branch features",
+  "attention_fusion": false,
+  "dropout_rate": 0.3,
+  "optimizer": "Adam",
+  "learning_rate": 0.001,
+  "loss": "SparseCategoricalCrossentropy (unweighted)",
+  "training_metric": "SparseCategoricalAccuracy (unweighted reporting metric)",
+  "classification_head": "Concatenate -> Dropout -> Dense(5, softmax)",
+  "batch_size": 16,
+  "batch_sizes_used": [
+    16
+  ],
+  "seed": 42,
+  "class_weighting": "none",
+  "validation_loss_weighting": "none",
+  "test_split_used_for_weight_calculation": false,
+  "target_epochs": 40,
+  "last_completed_epoch": 40,
+  "best_val_loss": 0.6735343933105469,
+  "checkpoint_dir": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\fusion\\checkpoints\\run_001",
+  "best_model_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\fusion\\runs\\run_001\\best_model.weights.h5",
+  "training_history_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\fusion\\runs\\run_001\\training_history.csv",
+  "last_checkpoint": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\fusion\\checkpoints\\run_001\\ckpt-40",
+  "best_model_format": "keras_weights_hdf5"
+}

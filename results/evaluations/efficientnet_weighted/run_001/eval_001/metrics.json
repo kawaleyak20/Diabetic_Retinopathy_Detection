@@ -1,0 +1,68 @@
+{
+  "model_name": "efficientnet_weighted",
+  "model_display_name": "EfficientNetB0 (class-weighted)",
+  "run_id": "run_001",
+  "evaluation_id": "eval_001",
+  "split": "validation",
+  "dataset_format": "btgraham-300",
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "n_examples": 10906,
+  "batch_size": 16,
+  "accuracy": 0.7330827067669173,
+  "macro_f1": 0.36826895549216776,
+  "weighted_f1": 0.7031458844312753,
+  "quadratic_weighted_kappa": 0.4830979382422801,
+  "per_class_recall": {
+    "No DR": 0.8998769987699877,
+    "Mild NPDR": 0.015277777777777777,
+    "Moderate NPDR": 0.3065231158961368,
+    "Severe NPDR": 0.16033755274261605,
+    "Proliferative DR (PDR)": 0.6083333333333333
+  },
+  "confusion_matrix": [
+    [
+      7316,
+      64,
+      550,
+      53,
+      147
+    ],
+    [
+      640,
+      11,
+      58,
+      3,
+      8
+    ],
+    [
+      940,
+      10,
+      484,
+      54,
+      91
+    ],
+    [
+      41,
+      6,
+      103,
+      38,
+      49
+    ],
+    [
+      26,
+      1,
+      43,
+      24,
+      146
+    ]
+  ],
+  "run_status_at_evaluation": "completed",
+  "run_best_validation_loss": 0.9261820316314697,
+  "evaluated_at": "2026-10-25T23:06:21+05:30"
+}

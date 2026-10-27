@@ -10,7 +10,12 @@
 /dataSources/
 /dataSources.local.xml
 api_token_kaggle.txt
+
 data/
+!data/1M
+!data/250K
+!data/btgraham-300
+
 reference_papers/*
 */__pycache__/*
 .ipynb_checkpoints/

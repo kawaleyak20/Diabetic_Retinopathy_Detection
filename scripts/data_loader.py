@@ -69,18 +69,15 @@ def inspect_dataset():
 
 
 def _prepare_example(example):
-    """Resize a decoded retinal image to model input size and return its label.
+    """Return a 300 x 300 float32 image and scalar label; retain 0-255 pixels.
 
-    TFDS's btgraham-300 preprocessing sets the eyeball radius to 300 pixels
-    and crops to 90% of that radius. It therefore commonly stores a 540x540
-    image, not a 300x300 image. Resize here to the shared model input size.
-    Pixel values remain in the 0-255 range; model-specific preprocessing is
-    handled by each model implementation.
+    TFDS btgraham-300 files can decode to a spatial size larger than the model
+    input size. Resize in the pipeline only; never rewrite the saved TFDS data.
     """
-    image = tf.ensure_shape(example["image"], [None, None, 3])
+    image = tf.cast(example["image"], tf.float32)
     image = tf.image.resize(
-        tf.cast(image, tf.float32),
-        size=[IMAGE_HEIGHT, IMAGE_WIDTH],
+        image,
+        [IMAGE_HEIGHT, IMAGE_WIDTH],
         method="bilinear",
         antialias=True,
     )
@@ -168,3 +165,30 @@ def make_datasets(batch_size=DEFAULT_BATCH_SIZE, seed=SEED):
         output_datasets["validation"],
         output_datasets["test"],
     )
+
+
+
+def make_evaluation_dataset(split_name, batch_size=DEFAULT_BATCH_SIZE):
+    """Build one official validation/test split without shuffling or re-splitting."""
+    if split_name not in (VALIDATION_SPLIT, TEST_SPLIT):
+        raise ValueError(
+            f"Evaluation split must be '{VALIDATION_SPLIT}' or '{TEST_SPLIT}', "
+            f"not {split_name!r}."
+        )
+    if int(batch_size) < 1:
+        raise ValueError("batch_size must be at least 1")
+
+    builder = load_builder()
+    if split_name not in builder.info.splits:
+        raise ValueError(
+            f"Required evaluation split '{split_name}' was not found. "
+            f"Available splits: {list(builder.info.splits.keys())}"
+        )
+
+    dataset = builder.as_dataset(
+        split=split_name,
+        shuffle_files=False,
+        read_config=tfds.ReadConfig(try_autocache=False),
+    )
+    dataset = dataset.map(_prepare_example, num_parallel_calls=tf.data.AUTOTUNE)
+    return dataset.batch(int(batch_size)).prefetch(tf.data.AUTOTUNE)

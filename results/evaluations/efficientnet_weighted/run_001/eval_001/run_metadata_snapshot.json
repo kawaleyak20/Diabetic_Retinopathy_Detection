@@ -1,0 +1,60 @@
+{
+  "model_name": "efficientnet_weighted",
+  "experiment": "class-weighted EfficientNet baseline",
+  "architecture": "EfficientNetB0",
+  "run_id": "run_001",
+  "status": "completed",
+  "created_at": "2026-10-23T21:07:39+05:30",
+  "updated_at": "2026-10-24T00:00:07+05:30",
+  "dataset": "diabetic_retinopathy_detection",
+  "dataset_format": "btgraham-300",
+  "input_size": [
+    300,
+    300,
+    3
+  ],
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "pretrained_weights": "imagenet",
+  "backbone_trainable": false,
+  "dropout_rate": 0.3,
+  "optimizer": "Adam",
+  "learning_rate": 0.001,
+  "loss": "SparseCategoricalCrossentropy with per-example training sample weights",
+  "training_metric": "SparseCategoricalAccuracy (unweighted metric)",
+  "batch_size": 16,
+  "batch_sizes_used": [
+    16
+  ],
+  "seed": 42,
+  "class_weighting": "balanced inverse-frequency: N / (K * n_c), training split only",
+  "training_class_counts": [
+    25810,
+    2443,
+    5292,
+    873,
+    708
+  ],
+  "class_weights": [
+    0.27218907400232467,
+    2.875644699140401,
+    1.3275132275132275,
+    8.047193585337915,
+    9.922598870056497
+  ],
+  "validation_loss_weighting": "none",
+  "test_split_used_for_weight_calculation": false,
+  "target_epochs": 50,
+  "last_completed_epoch": 50,
+  "best_val_loss": 0.9261820316314697,
+  "checkpoint_dir": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_weighted\\checkpoints\\run_001",
+  "best_model_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_weighted\\runs\\run_001\\best_model.weights.h5",
+  "training_history_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_weighted\\runs\\run_001\\training_history.csv",
+  "best_model_format": "keras_weights_hdf5",
+  "last_checkpoint": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_weighted\\checkpoints\\run_001\\ckpt-50"
+}
