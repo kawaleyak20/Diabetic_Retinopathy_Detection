@@ -1,0 +1,4 @@
+data/250K/** filter=lfs diff=lfs merge=lfs -text
+data/btgraham-300/** filter=lfs diff=lfs merge=lfs -text
+data/1M/** filter=lfs diff=lfs merge=lfs -text
+*.tfrecord* filter=lfs diff=lfs merge=lfs -text
