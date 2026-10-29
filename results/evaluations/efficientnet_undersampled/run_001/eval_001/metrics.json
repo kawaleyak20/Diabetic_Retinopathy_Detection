@@ -1,0 +1,92 @@
+{
+  "model_name": "efficientnet_undersampled",
+  "model_display_name": "EfficientNetB0 (unweighted) (fixed 70:10:20 subset; train cap 2,500/class)",
+  "run_id": "run_001",
+  "evaluation_id": "eval_001",
+  "split": "test",
+  "dataset_format": "btgraham-300",
+  "training_sampling_mode": "undersampled",
+  "training_sampling": "fixed 70:10:20 train/validation/test subset manifest",
+  "max_training_examples_per_class": 2500,
+  "training_subset_manifest_path": "manifests\\undersampling\\fixed_splits_seed42_cap2500_70-10-20.json",
+  "training_subset_sha256": "0e2d8969d3ea34a2466bf438d91634a95d8828d65d1e9d652c407e6b865b8dcb",
+  "split_manifest_sha256": "d8a125deedf71c91bc844c3cbe64e0d2a4ee144dcf604093e899a56401d7d471",
+  "training_split_manifest_sha256": "d8a125deedf71c91bc844c3cbe64e0d2a4ee144dcf604093e899a56401d7d471",
+  "legacy_training_split_metadata": false,
+  "evaluation_subset_sha256": "c2bffb37c16bd99ed478f535649d83c05b1532f9d29bcd8a64225f8199ffcff2",
+  "training_class_counts": [
+    2500,
+    2443,
+    2500,
+    873,
+    708
+  ],
+  "n_training_examples_after_sampling": 9024,
+  "n_validation_examples_after_sampling": 1289,
+  "n_test_examples_after_sampling": 2578,
+  "split_ratios": {
+    "train": 70,
+    "validation": 10,
+    "test": 20
+  },
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "n_examples": 2578,
+  "batch_size": 16,
+  "accuracy": 0.5973622963537626,
+  "macro_f1": 0.41236658052632197,
+  "weighted_f1": 0.6327741452334096,
+  "quadratic_weighted_kappa": 0.44267655190489463,
+  "per_class_recall": {
+    "No DR": 0.6626251976805483,
+    "Mild NPDR": 0.23369565217391305,
+    "Moderate NPDR": 0.5105263157894737,
+    "Severe NPDR": 0.22033898305084745,
+    "Proliferative DR (PDR)": 0.5689655172413793
+  },
+  "confusion_matrix": [
+    [
+      1257,
+      236,
+      378,
+      3,
+      23
+    ],
+    [
+      99,
+      43,
+      42,
+      0,
+      0
+    ],
+    [
+      112,
+      45,
+      194,
+      12,
+      17
+    ],
+    [
+      4,
+      1,
+      37,
+      13,
+      4
+    ],
+    [
+      3,
+      1,
+      18,
+      3,
+      33
+    ]
+  ],
+  "run_status_at_evaluation": "completed",
+  "run_best_validation_loss": 1.016137719154358,
+  "evaluated_at": "2026-10-29T13:48:50+05:30"
+}

@@ -33,6 +33,43 @@ DEFAULT_BATCH_SIZE = 4
 DEFAULT_TARGET_EPOCHS = 10
 CHECKPOINTS_TO_KEEP = None  # Keep every epoch checkpoint inside a run.
 
+# Fast fixed-subset experiment. One standalone notebook creates a single manifest
+# for all three official splits. Model scripts never perform random sampling.
+TRAINING_SAMPLING_MODE = "undersampled"
+UNDERSAMPLE_MAX_PER_CLASS = 2500
+UNDERSAMPLE_SEED = SEED
+TRAIN_RATIO = 70
+VALIDATION_RATIO = 10
+TEST_RATIO = 20
+UNDERSAMPLING_MANIFEST_PATH = (
+    PROJECT_ROOT
+    / "manifests"
+    / "undersampling"
+    / f"fixed_splits_seed{UNDERSAMPLE_SEED}_cap{UNDERSAMPLE_MAX_PER_CLASS}_70-10-20.json"
+)
+
+
+def normalize_training_sampling_mode(mode=None):
+    """Resolve and validate the shared training-sampling mode."""
+    value = TRAINING_SAMPLING_MODE if mode is None else mode
+    value = str(value).strip().lower()
+    if value not in {"full", "undersampled"}:
+        raise ValueError(
+            "Training sampling mode must be 'full' or 'undersampled', "
+            f"not {value!r}."
+        )
+    if value == "undersampled" and UNDERSAMPLE_MAX_PER_CLASS < 1:
+        raise ValueError("UNDERSAMPLE_MAX_PER_CLASS must be at least 1.")
+    return value
+
+
+def training_model_name(base_model_name, mode=None):
+    """Return an isolated output key for the selected sampling strategy."""
+    sampling_mode = normalize_training_sampling_mode(mode)
+    if sampling_mode == "undersampled":
+        return f"{base_model_name}_undersampled"
+    return str(base_model_name)
+
 # Unweighted EfficientNetB0 baseline.
 EFFICIENTNET_VARIANT = "B0"
 EFFICIENTNET_WEIGHTS = "imagenet"

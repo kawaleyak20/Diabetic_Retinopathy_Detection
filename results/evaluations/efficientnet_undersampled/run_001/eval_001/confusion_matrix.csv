@@ -1,0 +1,6 @@
+true_label,No DR,Mild NPDR,Moderate NPDR,Severe NPDR,Proliferative DR (PDR)
+No DR,1257,236,378,3,23
+Mild NPDR,99,43,42,0,0
+Moderate NPDR,112,45,194,12,17
+Severe NPDR,4,1,37,13,4
+Proliferative DR (PDR),3,1,18,3,33

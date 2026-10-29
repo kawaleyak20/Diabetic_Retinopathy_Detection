@@ -1,4 +1,8 @@
-"""Train or resume the initial EfficientNetB0 diabetic-retinopathy baseline."""
+"""Train or resume the initial EfficientNetB0 diabetic-retinopathy baseline.
+
+Undersampled runs consume the fixed manifest from prepare_undersampled_split.ipynb;
+this script does not choose or drop random examples.
+"""
 
 from pathlib import Path
 
@@ -26,7 +30,8 @@ from configs.config import (
     NUM_CLASSES,
     SEED,
 )
-from scripts.data_loader import make_datasets
+from scripts.data_loader import make_datasets, get_training_sampling_summary
+from configs.config import normalize_training_sampling_mode, training_model_name
 from scripts.utils import (
     RecoveryCheckpointCallback,
     best_model_exists,
@@ -139,9 +144,9 @@ class BestValidationModelCallback(tf.keras.callbacks.Callback):
             print(f"Saved best validation model: {self.best_model_path}")
 
 
-def _new_metadata(paths, batch_size, target_epochs, seed):
+def _new_metadata(paths, batch_size, target_epochs, seed, model_name, sampling_info):
     return {
-        "model_name": "efficientnet",
+        "model_name": model_name,
         "architecture": "EfficientNetB0",
         "run_id": paths["run_id"],
         "status": "initialized",
@@ -157,6 +162,7 @@ def _new_metadata(paths, batch_size, target_epochs, seed):
         "batch_sizes_used": [batch_size],
         "seed": seed,
         "class_weighting": "none (initial baseline)",
+        **sampling_info,
         "target_epochs": target_epochs,
         "last_completed_epoch": 0,
         "best_val_loss": None,
@@ -172,7 +178,8 @@ def train_efficientnet(
     epochs=DEFAULT_TARGET_EPOCHS,
     seed=SEED,
     allow_cpu=False,
-    learning_rate = 0
+    learning_rate=0,
+    training_sampling_mode=None,
 ):
     """Start a new run or resume the newest checkpointed EfficientNet run.
 
@@ -192,6 +199,9 @@ def train_efficientnet(
 
     batch_size = int(batch_size)
     epochs = int(epochs)
+    sampling_mode = normalize_training_sampling_mode(training_sampling_mode)
+    run_name = training_model_name("efficientnet", sampling_mode)
+    sampling_info = get_training_sampling_summary(seed=seed, training_sampling_mode=sampling_mode)
     devices = tf.config.list_physical_devices("GPU")
     if not devices and not allow_cpu:
         raise RuntimeError(
@@ -207,19 +217,49 @@ def train_efficientnet(
         print("WARNING: Running explicitly on CPU. Training may be very slow.")
 
     if run_mode == "scratch":
-        paths = create_new_run("efficientnet")
-        metadata = _new_metadata(paths, batch_size, epochs, seed)
+        paths = create_new_run(run_name)
+        metadata = _new_metadata(paths, batch_size, epochs, seed, run_name, sampling_info)
         save_json(paths["metadata_path"], metadata)
         start_epoch = 0
-        print(f"Starting a new, separate run: {paths['run_id']}")
+        print(f"Starting a new, separate run: {run_name}/{paths['run_id']}")
     else:
-        paths = find_latest_resumable_run("efficientnet")
+        paths = find_latest_resumable_run(run_name)
         if paths is None:
             raise FileNotFoundError(
-                "Resume was selected, but no valid EfficientNet recovery checkpoint "
+                f"Resume was selected, but no valid EfficientNet recovery checkpoint for {run_name} "
                 "was found. Choose 'scratch' explicitly to create a fresh run."
             )
         metadata = paths["metadata"]
+        saved_mode = metadata.get("training_sampling_mode", "full")
+        saved_cap = metadata.get("max_training_examples_per_class")
+        expected_cap = sampling_info["max_training_examples_per_class"]
+        saved_sampling_seed = metadata.get("training_sampling_seed", metadata.get("seed", seed))
+        expected_sampling_seed = sampling_info["training_sampling_seed"]
+        saved_training_seed = metadata.get("seed", seed)
+        saved_subset_sha256 = metadata.get("training_subset_sha256")
+        expected_subset_sha256 = sampling_info.get("training_subset_sha256")
+        saved_split_manifest_sha256 = metadata.get("split_manifest_sha256")
+        expected_split_manifest_sha256 = sampling_info.get("split_manifest_sha256")
+        manifest_changed = (
+            sampling_mode == "undersampled"
+            and (
+                saved_subset_sha256 != expected_subset_sha256
+                or saved_split_manifest_sha256 != expected_split_manifest_sha256
+            )
+        )
+        if (
+            saved_mode != sampling_mode
+            or saved_cap != expected_cap
+            or saved_sampling_seed != expected_sampling_seed
+            or saved_training_seed != seed
+            or manifest_changed
+        ):
+            raise ValueError(
+                "The saved run uses a different training mode, per-class cap, seed, or "
+                "fixed train/validation/test manifest. Undersampled runs must use the exact "
+                "same saved split manifest to resume. Use run_mode='scratch' for a new run."
+            )
+        metadata.update(sampling_info)
         start_epoch = int(metadata.get("last_completed_epoch", 0))
         if epochs <= start_epoch:
             raise ValueError(
@@ -240,10 +280,8 @@ def train_efficientnet(
         metadata["updated_at"] = timestamp_now()
 
     try:
-        # Scratch starts from ImageNet weights. Resume restores every model weight
-        # from the local recovery checkpoint, so it must not depend on a download.
-        initial_weights = EFFICIENTNET_WEIGHTS if run_mode == "scratch" else None
-        model = build_efficientnet_model(weights=initial_weights)
+        # ImageNet weights are downloaded only if they are not already cached.
+        model = build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS)
 
         completed_epoch = tf.Variable(0, dtype=tf.int64, trainable=False, name="completed_epoch")
         best_val_loss = tf.Variable(float("inf"), dtype=tf.float32, trainable=False, name="best_val_loss")
@@ -310,7 +348,7 @@ def train_efficientnet(
         metadata["best_model_format"] = "keras_weights_hdf5"
         save_json(paths["metadata_path"], metadata)
 
-        train_ds, validation_ds, _ = make_datasets(batch_size=batch_size, seed=seed)
+        train_ds, validation_ds, _ = make_datasets(batch_size=batch_size, seed=seed, training_sampling_mode=sampling_mode)
         callbacks = [
             # Save resumable model+optimizer state before best-model serialization.
             # If best-model export fails, this epoch can still be resumed safely.
@@ -333,6 +371,7 @@ def train_efficientnet(
             ),
         ]
 
+        print(f"Training sampling mode: {sampling_mode}; cap: {sampling_info['max_training_examples_per_class']}")
         print(f"Input size: {IMAGE_HEIGHT}x{IMAGE_WIDTH}; classes: {NUM_CLASSES}")
         print(f"Starting at epoch {start_epoch}; target total epochs: {epochs}")
         history = model.fit(

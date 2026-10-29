@@ -29,13 +29,21 @@ from sklearn.metrics import (
 from configs.config import (
     CLASS_NAMES,
     DEFAULT_BATCH_SIZE,
+    DENSENET_WEIGHTS,
+    EFFICIENTNET_WEIGHTS,
     FUSION_CLASS_WEIGHTED,
+    FUSION_WEIGHTS,
     IMAGE_HEIGHT,
     IMAGE_WIDTH,
     RESULTS_DIR,
     SEED,
+    UNDERSAMPLE_MAX_PER_CLASS,
 )
-from scripts.data_loader import make_evaluation_dataset
+from scripts.data_loader import (
+    get_split_sampling_summary,
+    load_undersampling_manifest,
+    make_evaluation_dataset,
+)
 from scripts.utils import load_json, run_paths, timestamp_now
 from scripts.train_efficientnet import build_efficientnet_model
 from scripts.train_densenet import build_densenet_model
@@ -58,6 +66,12 @@ MODEL_DISPLAY_NAMES = {
         else "EfficientNetB0 + DenseNet121 fusion (unweighted)"
     ),
 }
+MODEL_WEIGHTS = {
+    "efficientnet": EFFICIENTNET_WEIGHTS,
+    "efficientnet_weighted": EFFICIENTNET_WEIGHTS,
+    "densenet": DENSENET_WEIGHTS,
+    "fusion": FUSION_WEIGHTS,
+}
 MODEL_ARCHITECTURES = {
     "efficientnet": "EfficientNetB0",
     "efficientnet_weighted": "EfficientNetB0",
@@ -70,6 +84,19 @@ MODEL_IS_WEIGHTED = {
     "densenet": True,
     "fusion": FUSION_CLASS_WEIGHTED,
 }
+
+# The sampled variants use identical architectures and evaluation code, but have
+# isolated run/result roots so they cannot overwrite full-data experiment runs.
+for _base_key in ("efficientnet", "efficientnet_weighted", "densenet", "fusion"):
+    _sampled_key = f"{_base_key}_undersampled"
+    MODEL_BUILDERS[_sampled_key] = MODEL_BUILDERS[_base_key]
+    MODEL_DISPLAY_NAMES[_sampled_key] = (
+        MODEL_DISPLAY_NAMES[_base_key]
+        + f" (fixed 70:10:20 subset; train cap {UNDERSAMPLE_MAX_PER_CLASS:,}/class)"
+    )
+    MODEL_WEIGHTS[_sampled_key] = MODEL_WEIGHTS[_base_key]
+    MODEL_ARCHITECTURES[_sampled_key] = MODEL_ARCHITECTURES[_base_key]
+    MODEL_IS_WEIGHTED[_sampled_key] = MODEL_IS_WEIGHTED[_base_key]
 RUN_ID_PATTERN = re.compile(r"^run_\d{3,}$")
 EVALUATION_ID_PATTERN = re.compile(r"^eval_\d{3,}$")
 
@@ -117,6 +144,23 @@ def _check_model_run(model_name, run_id):
     if uses_class_weights != MODEL_IS_WEIGHTED[model_name]:
         raise ValueError(
             f"Run class-weighting metadata does not match the experiment key {model_name!r}."
+        )
+    expected_sampling_mode = "undersampled" if model_name.endswith("_undersampled") else "full"
+    actual_sampling_mode = metadata.get("training_sampling_mode", "full")
+    expected_cap = UNDERSAMPLE_MAX_PER_CLASS if expected_sampling_mode == "undersampled" else None
+    actual_cap = metadata.get("max_training_examples_per_class")
+    if actual_sampling_mode != expected_sampling_mode or actual_cap != expected_cap:
+        raise ValueError(
+            "The run's sampling metadata does not match the selected model key. "
+            "Use the full-data key for full-data runs and the *_undersampled key "
+            "for the fixed-manifest training runs."
+        )
+    if expected_sampling_mode == "undersampled" and not metadata.get("training_subset_sha256"):
+        raise ValueError(
+            "This undersampled run predates the fixed manifest workflow and has no "
+            "saved subset checksum. Start a new undersampled run after running "
+            "prepare_undersampled_split.ipynb so model comparisons use a verifiable, "
+            "shared training subset."
         )
     if metadata.get("dataset_format", "btgraham-300") != "btgraham-300":
         raise ValueError("This evaluator expects the project's btgraham-300 input format.")
@@ -197,11 +241,12 @@ def evaluate_model(
     confirm_test=False,
     allow_repeated_test=False,
 ):
-    """Evaluate one completed model run on the official validation or test split.
+    """Evaluate one completed run on its mode-appropriate validation/test subset.
 
-    Test evaluation requires ``confirm_test=True``. Re-evaluating the same model
-    run on test requires the additional explicit ``allow_repeated_test=True``.
-    Use validation metrics for model selection; do not repeatedly tune against test.
+    Full-data model keys use the complete official split. Keys ending in
+    ``_undersampled`` use the fixed validation/test indices from the saved 70:10:20
+    manifest. Test evaluation requires ``confirm_test=True``; repeated test evaluation
+    requires ``allow_repeated_test=True``. Use validation for model selection.
     """
     split = str(split).strip().lower()
     if split not in {"validation", "test"}:
@@ -210,7 +255,7 @@ def evaluate_model(
         raise ValueError("batch_size must be at least 1")
     if split == "test" and not confirm_test:
         raise ValueError(
-            "Test is held out for final evaluation. To proceed deliberately, call with "
+            "The test split/subset is held out for final evaluation. To proceed, call with "
             "confirm_test=True after model selection is complete."
         )
     paths, run_metadata = _check_model_run(model_name, run_id)
@@ -221,11 +266,46 @@ def evaluate_model(
             "for a deliberate re-evaluation."
         )
 
-    # Best artifacts contain all trained weights. Rebuild the same architecture
-    # without downloading ImageNet weights, then load the selected run's artifact.
-    model = MODEL_BUILDERS[model_name](weights=None)
+    # Full-data models use complete official evaluation splits. Undersampled model
+    # keys use the fixed reduced subset manifest used for training/validation.
+    sampling_mode = "undersampled" if model_name.endswith("_undersampled") else "full"
+    split_sampling_info = get_split_sampling_summary(split, sampling_mode=sampling_mode)
+    current_manifest = None
+    legacy_split_metadata = False
+    if sampling_mode == "undersampled":
+        current_manifest = load_undersampling_manifest()
+        run_manifest_hash = run_metadata.get("split_manifest_sha256")
+        current_manifest_hash = current_manifest.get("split_manifest_sha256")
+        current_train_hash = current_manifest["splits"]["train"]["indices_sha256"]
+        same_train_subset = run_metadata.get("training_subset_sha256") == current_train_hash
+        if not same_train_subset:
+            raise ValueError(
+                "The run's saved training-subset checksum does not match the current "
+                "manifest. Restore the matching manifest or start a new run."
+            )
+        if run_manifest_hash != current_manifest_hash:
+            # Backward compatibility for completed runs trained with the earlier fixed
+            # TRAIN-only manifest. Exact train-index hash is required, and provenance is
+            # explicitly marked in the resulting evaluation report.
+            if run_manifest_hash:
+                raise ValueError(
+                    "This run was trained with a different saved split manifest. "
+                    "Restore the matching manifest or start a new run."
+                )
+            legacy_split_metadata = True
+            print(
+                "NOTE: This run predates the 70:10:20 manifest. Its saved training-subset "
+                "checksum matches exactly, so it will be evaluated on the newly fixed "
+                "validation/test subset. Its best epoch was selected using the older "
+                "validation protocol; record this limitation in your comparison."
+            )
+
+    # The best artifact contains weights only, so rebuild the graph before loading it.
+    model = MODEL_BUILDERS[model_name](weights=MODEL_WEIGHTS[model_name])
     model.load_weights(str(paths["best_model_path"]))
-    dataset = make_evaluation_dataset(split, batch_size=int(batch_size))
+    dataset = make_evaluation_dataset(
+        split, batch_size=int(batch_size), sampling_mode=sampling_mode
+    )
 
     true_batches = []
     probability_batches = []
@@ -251,6 +331,11 @@ def evaluate_model(
         )
     if len(y_true) != len(probabilities):
         raise ValueError("Prediction count does not match the number of true labels.")
+    if len(y_true) != int(split_sampling_info["n_examples"]):
+        raise ValueError(
+            f"Expected {split_sampling_info['n_examples']} selected {split} examples, "
+            f"but received {len(y_true)}. The manifest or loader is inconsistent."
+        )
     if not np.isfinite(probabilities).all():
         raise ValueError("Model predictions contain NaN or infinite values; metrics were not saved.")
     y_pred = np.argmax(probabilities, axis=1).astype(np.int64)
@@ -274,6 +359,20 @@ def evaluate_model(
         "evaluation_id": output_dir.name,
         "split": split,
         "dataset_format": run_metadata.get("dataset_format", "btgraham-300"),
+        "training_sampling_mode": run_metadata.get("training_sampling_mode", "full"),
+        "training_sampling": run_metadata.get("training_sampling", "all examples in the official training split; no undersampling"),
+        "max_training_examples_per_class": run_metadata.get("max_training_examples_per_class"),
+        "training_subset_manifest_path": run_metadata.get("training_subset_manifest_path"),
+        "training_subset_sha256": run_metadata.get("training_subset_sha256"),
+        "split_manifest_sha256": split_sampling_info.get("split_manifest_sha256"),
+        "training_split_manifest_sha256": run_metadata.get("split_manifest_sha256"),
+        "legacy_training_split_metadata": bool(legacy_split_metadata),
+        "evaluation_subset_sha256": split_sampling_info.get("evaluation_subset_sha256"),
+        "training_class_counts": run_metadata.get("training_class_counts"),
+        "n_training_examples_after_sampling": run_metadata.get("retained_training_examples"),
+        "n_validation_examples_after_sampling": run_metadata.get("validation_examples_after_sampling"),
+        "n_test_examples_after_sampling": run_metadata.get("test_examples_after_sampling"),
+        "split_ratios": run_metadata.get("split_ratios"),
         "class_names": list(CLASS_NAMES),
         "n_examples": int(len(y_true)),
         "batch_size": int(batch_size),
@@ -357,6 +456,9 @@ def list_saved_evaluations(model_name=None):
                 "run_id": metrics.get("run_id", metrics_path.parents[1].name),
                 "evaluation_id": metrics.get("evaluation_id", metrics_path.parent.name),
                 "split": metrics.get("split", "unknown"),
+                "training_sampling_mode": metrics.get("training_sampling_mode", "full"),
+                "max_training_examples_per_class": metrics.get("max_training_examples_per_class"),
+                "training_subset_sha256": metrics.get("training_subset_sha256"),
                 "accuracy": metrics.get("accuracy"),
                 "macro_f1": metrics.get("macro_f1"),
                 "weighted_f1": metrics.get("weighted_f1"),
@@ -383,6 +485,9 @@ def compare_evaluations(selected_evaluations):
     dataset_formats = set()
     class_orders = set()
     example_counts = set()
+    undersampled_subset_hashes = set()
+    undersampled_manifest_hashes = set()
+    undersampled_eval_subset_hashes = set()
     for item in selected_evaluations:
         model_name = item.get("model_name")
         run_id = item.get("run_id")
@@ -415,12 +520,35 @@ def compare_evaluations(selected_evaluations):
         dataset_formats.add(metrics.get("dataset_format", "btgraham-300"))
         class_orders.add(tuple(metrics.get("class_names", [])))
         example_counts.add(metrics.get("n_examples"))
+        if metrics.get("training_sampling_mode", "full") == "undersampled":
+            subset_hash = metrics.get("training_subset_sha256")
+            manifest_hash = metrics.get("split_manifest_sha256")
+            eval_subset_hash = metrics.get("evaluation_subset_sha256")
+            if not subset_hash or not manifest_hash or not eval_subset_hash:
+                raise ValueError(
+                    f"Undersampled evaluation {model_name}/{run_id}/{evaluation_id} lacks "
+                    "the fixed train/evaluation subset checksums. Re-evaluate a run created "
+                    "with the saved 70:10:20 split manifest."
+                )
+            undersampled_subset_hashes.add(subset_hash)
+            undersampled_manifest_hashes.add(manifest_hash)
+            undersampled_eval_subset_hashes.add(eval_subset_hash)
         row = {
             "model_name": model_name,
             "model": metrics.get("model_display_name", MODEL_DISPLAY_NAMES[model_name]),
             "run_id": run_id,
             "evaluation_id": evaluation_id,
             "split": metrics.get("split"),
+            "training_sampling_mode": metrics.get("training_sampling_mode", "full"),
+            "max_training_examples_per_class": metrics.get("max_training_examples_per_class"),
+            "training_subset_sha256": metrics.get("training_subset_sha256"),
+            "split_manifest_sha256": metrics.get("split_manifest_sha256"),
+            "training_split_manifest_sha256": metrics.get("training_split_manifest_sha256"),
+            "legacy_training_split_metadata": metrics.get("legacy_training_split_metadata"),
+            "evaluation_subset_sha256": metrics.get("evaluation_subset_sha256"),
+            "n_training_examples_after_sampling": metrics.get("n_training_examples_after_sampling"),
+            "n_validation_examples_after_sampling": metrics.get("n_validation_examples_after_sampling"),
+            "n_test_examples_after_sampling": metrics.get("n_test_examples_after_sampling"),
             "n_examples": metrics.get("n_examples"),
             "accuracy": metrics.get("accuracy"),
             "macro_f1": metrics.get("macro_f1"),
@@ -432,6 +560,17 @@ def compare_evaluations(selected_evaluations):
             row[column_name] = recall_value
         rows.append(row)
 
+    if len(undersampled_subset_hashes) > 1 or len(undersampled_manifest_hashes) > 1:
+        raise ValueError(
+            "The selected undersampled model evaluations used different saved split manifests. "
+            "Select runs with the same split_manifest_sha256 so training, validation and test "
+            "examples are identical across models."
+        )
+    if len(undersampled_eval_subset_hashes) > 1:
+        raise ValueError(
+            "The selected undersampled evaluations used different validation/test examples. "
+            "Select reports generated from the same fixed split manifest."
+        )
     if len(splits) != 1:
         raise ValueError(f"Cannot compare reports from different splits: {sorted(str(s) for s in splits)}")
     if len(dataset_formats) != 1 or len(class_orders) != 1 or len(example_counts) != 1:

@@ -1,0 +1,71 @@
+{
+  "model_name": "efficientnet_undersampled",
+  "architecture": "EfficientNetB0",
+  "run_id": "run_001",
+  "status": "completed",
+  "created_at": "2026-10-29T12:02:17+05:30",
+  "updated_at": "2026-10-29T12:10:38+05:30",
+  "dataset": "diabetic_retinopathy_detection",
+  "dataset_format": "btgraham-300",
+  "input_size": [
+    300,
+    300,
+    3
+  ],
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "pretrained_weights": "imagenet",
+  "backbone_trainable": false,
+  "batch_size": 32,
+  "batch_sizes_used": [
+    32
+  ],
+  "seed": 42,
+  "class_weighting": "none (initial baseline)",
+  "training_sampling_mode": "undersampled",
+  "training_sampling": "fixed 70:10:20 train/validation/test subset manifest",
+  "max_training_examples_per_class": 2500,
+  "training_sampling_seed": 42,
+  "original_training_examples": 35126,
+  "retained_training_examples": 9024,
+  "original_training_class_counts": [
+    25810,
+    2443,
+    5292,
+    873,
+    708
+  ],
+  "training_class_counts": [
+    2500,
+    2443,
+    2500,
+    873,
+    708
+  ],
+  "training_subset_manifest_path": "manifests\\undersampling\\fixed_splits_seed42_cap2500_70-10-20.json",
+  "training_subset_sha256": "0e2d8969d3ea34a2466bf438d91634a95d8828d65d1e9d652c407e6b865b8dcb",
+  "validation_examples_after_sampling": 1289,
+  "validation_subset_sha256": "7be5aeb8da5cb72cc2d69e4ec9d9ea23567271e05f7206b26165897c55755d41",
+  "test_examples_after_sampling": 2578,
+  "test_subset_sha256": "c2bffb37c16bd99ed478f535649d83c05b1532f9d29bcd8a64225f8199ffcff2",
+  "split_manifest_sha256": "d8a125deedf71c91bc844c3cbe64e0d2a4ee144dcf604093e899a56401d7d471",
+  "split_manifest_path": "manifests\\undersampling\\fixed_splits_seed42_cap2500_70-10-20.json",
+  "split_ratios": {
+    "train": 70,
+    "validation": 10,
+    "test": 20
+  },
+  "target_epochs": 10,
+  "last_completed_epoch": 10,
+  "best_val_loss": 1.016137719154358,
+  "checkpoint_dir": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_undersampled\\checkpoints\\run_001",
+  "best_model_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_undersampled\\runs\\run_001\\best_model.weights.h5",
+  "training_history_path": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_undersampled\\runs\\run_001\\training_history.csv",
+  "best_model_format": "keras_weights_hdf5",
+  "last_checkpoint": "D:\\M L\\Diabetic_Retinopathy_Detection_mini_project\\models\\efficientnet_undersampled\\checkpoints\\run_001\\ckpt-10"
+}
