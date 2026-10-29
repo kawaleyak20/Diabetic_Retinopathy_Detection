@@ -1,4 +1,8 @@
-"""Train or resume the initial EfficientNetB0 + DenseNet121 feature-fusion model."""
+"""Train or resume the initial EfficientNetB0 + DenseNet121 feature-fusion model.
+
+Undersampled runs consume the fixed manifest from prepare_undersampled_split.ipynb;
+this script does not choose or drop random examples.
+"""
 
 import math
 from pathlib import Path
@@ -29,7 +33,8 @@ from configs.config import (
     SEED,
     TRAIN_SPLIT,
 )
-from scripts.data_loader import load_builder, make_datasets
+from scripts.data_loader import load_builder, make_datasets, get_training_sampling_summary
+from configs.config import normalize_training_sampling_mode, training_model_name
 from scripts.train_efficientnet import _save_weights_atomically
 from scripts.utils import (
     RecoveryCheckpointCallback,
@@ -90,32 +95,28 @@ def build_fusion_model(weights=FUSION_WEIGHTS):
     return model
 
 
-def calculate_training_class_weights():
-    """Calculate balanced inverse-frequency weights from train labels only."""
-    builder = load_builder()
-    label_dataset = builder.as_dataset(
-        split=TRAIN_SPLIT,
-        shuffle_files=False,
-        read_config=tfds.ReadConfig(try_autocache=False),
-        decoders={"image": tfds.decode.SkipDecoding()},
-    )
-    class_counts = np.zeros(NUM_CLASSES, dtype=np.int64)
-    for example in label_dataset:
-        label = int(example["label"].numpy())
-        if label < 0 or label >= NUM_CLASSES:
-            raise ValueError(f"Found out-of-range training label: {label}")
-        class_counts[label] += 1
+def calculate_training_class_weights(seed=SEED, training_sampling_mode=None):
+    """Return counts and inverse-frequency weights for the selected train subset.
 
+    Counts come only from the official training split. In undersampled mode they
+    describe the retained examples, not the original imbalanced split.
+    """
+    sampling_info = get_training_sampling_summary(
+        seed=seed,
+        training_sampling_mode=training_sampling_mode,
+    )
+    class_counts = np.asarray(sampling_info["training_class_counts"], dtype=np.int64)
     total_examples = int(class_counts.sum())
     if total_examples == 0:
-        raise ValueError("The official training split contained no examples.")
+        raise ValueError("The selected training subset contained no examples.")
     if np.any(class_counts == 0):
-        missing = np.flatnonzero(class_counts == 0).tolist()
-        raise ValueError(f"Cannot calculate class weights; training split lacks class(es): {missing}")
-
-    weights = total_examples / (NUM_CLASSES * class_counts.astype(np.float64))
-    return class_counts.astype(int).tolist(), weights.astype(float).tolist()
-
+        missing_classes = np.flatnonzero(class_counts == 0).tolist()
+        raise ValueError(
+            "Cannot calculate balanced class weights because the selected training "
+            f"subset has no examples for class(es): {missing_classes}"
+        )
+    class_weights = total_examples / (NUM_CLASSES * class_counts.astype(np.float64))
+    return class_counts.astype(int).tolist(), class_weights.astype(float).tolist()
 
 def add_sample_weights(dataset, class_weights):
     """Attach per-example weights to batches; validation remains unweighted."""
@@ -155,9 +156,9 @@ class BestValidationWeightsCallback(tf.keras.callbacks.Callback):
             print(f"Saved best validation weights: {self.best_model_path}")
 
 
-def _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights):
+def _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights, model_name, sampling_info):
     metadata = {
-        "model_name": MODEL_NAME,
+        "model_name": model_name,
         "experiment": "EfficientNetB0 + DenseNet121 feature fusion",
         "architecture": ARCHITECTURE,
         "run_id": paths["run_id"],
@@ -181,7 +182,9 @@ def _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights):
         "batch_size": batch_size,
         "batch_sizes_used": [batch_size],
         "seed": seed,
-        "class_weighting": "balanced inverse-frequency: N / (K * n_c), training split only" if USE_CLASS_WEIGHTS else "none",
+        "class_weighting": "balanced inverse-frequency: N / (K * n_c), selected training subset only" if USE_CLASS_WEIGHTS else "none",
+        **sampling_info,
+        "training_class_counts": sampling_info["training_class_counts"],
         "validation_loss_weighting": "none",
         "test_split_used_for_weight_calculation": False,
         "target_epochs": epochs,
@@ -197,7 +200,15 @@ def _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights):
     return metadata
 
 
-def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_EPOCHS, seed=SEED, allow_cpu=False,learning_rate=0):
+def train_fusion(
+    run_mode,
+    batch_size=DEFAULT_BATCH_SIZE,
+    epochs=DEFAULT_TARGET_EPOCHS,
+    seed=SEED,
+    allow_cpu=False,
+    learning_rate=0,
+    training_sampling_mode=None,
+):
     """Train a new fusion run or resume its latest valid checkpoint."""
     run_mode = str(run_mode).strip().lower()
     if run_mode not in {"scratch", "resume"}:
@@ -205,6 +216,9 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
     if int(batch_size) < 1 or int(epochs) < 1:
         raise ValueError("batch_size and epochs must both be at least 1")
     batch_size, epochs = int(batch_size), int(epochs)
+    sampling_mode = normalize_training_sampling_mode(training_sampling_mode)
+    run_name = training_model_name("fusion", sampling_mode)
+    sampling_info = get_training_sampling_summary(seed=seed, training_sampling_mode=sampling_mode)
 
     if learning_rate != 0 :
         EFFICIENTNET_LEARNING_RATE = learning_rate
@@ -228,20 +242,45 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
 
     if run_mode == "scratch":
         if USE_CLASS_WEIGHTS:
-            class_counts, class_weights = calculate_training_class_weights()
+            class_counts, class_weights = calculate_training_class_weights(seed=seed, training_sampling_mode=sampling_mode)
         else:
             class_counts, class_weights = None, None
-        paths = create_new_run(MODEL_NAME)
-        metadata = _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights)
+        paths = create_new_run(run_name)
+        metadata = _new_metadata(paths, batch_size, epochs, seed, class_counts, class_weights, run_name, sampling_info)
         save_json(paths["metadata_path"], metadata)
         start_epoch = 0
-        print(f"Starting a new, separate run: {MODEL_NAME}/{paths['run_id']}")
+        print(f"Starting a new, separate run: {run_name}/{paths['run_id']}")
     else:
-        paths = find_latest_resumable_run(MODEL_NAME)
+        paths = find_latest_resumable_run(run_name)
         if paths is None:
             raise FileNotFoundError("No fusion recovery checkpoint found. Select 'scratch' for a fresh run.")
         metadata = paths["metadata"]
-        if metadata.get("model_name") != MODEL_NAME or metadata.get("architecture") != ARCHITECTURE:
+        saved_mode = metadata.get("training_sampling_mode", "full")
+        saved_cap = metadata.get("max_training_examples_per_class")
+        expected_cap = sampling_info["max_training_examples_per_class"]
+        saved_sampling_seed = metadata.get("training_sampling_seed", metadata.get("seed", seed))
+        expected_sampling_seed = sampling_info["training_sampling_seed"]
+        saved_training_seed = metadata.get("seed", seed)
+        saved_subset_sha256 = metadata.get("training_subset_sha256")
+        expected_subset_sha256 = sampling_info.get("training_subset_sha256")
+        manifest_changed = (
+            sampling_mode == "undersampled"
+            and saved_subset_sha256 != expected_subset_sha256
+        )
+        if (
+            saved_mode != sampling_mode
+            or saved_cap != expected_cap
+            or saved_sampling_seed != expected_sampling_seed
+            or saved_training_seed != seed
+            or manifest_changed
+        ):
+            raise ValueError(
+                "The saved run uses a different training mode, per-class cap, sample "
+                "manifest, or training seed. Undersampled runs must use the exact same "
+                "saved manifest to resume. Use run_mode='scratch' for a new run."
+            )
+        metadata.update(sampling_info)
+        if metadata.get("model_name") != run_name or metadata.get("architecture") != ARCHITECTURE:
             raise ValueError("The latest run metadata does not match the fusion trainer.")
         for key, expected in expected_settings.items():
             if metadata.get(key) != expected:
@@ -266,13 +305,10 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
         metadata["batch_size"] = batch_size
         metadata["target_epochs"] = epochs
         metadata["updated_at"] = timestamp_now()
-        print(f"Resuming {MODEL_NAME}/{paths['run_id']} from: {paths['latest_checkpoint']}")
+        print(f"Resuming {run_name}/{paths['run_id']} from: {paths['latest_checkpoint']}")
 
     try:
-        # Scratch starts from ImageNet weights. Resume restores both backbones
-        # and the fusion head from the local checkpoint without downloading weights.
-        initial_weights = FUSION_WEIGHTS if run_mode == "scratch" else None
-        model = build_fusion_model(weights=initial_weights)
+        model = build_fusion_model(weights=FUSION_WEIGHTS)
         completed_epoch = tf.Variable(0, dtype=tf.int64, trainable=False, name="completed_epoch")
         best_val_loss = tf.Variable(float("inf"), dtype=tf.float32, trainable=False, name="best_val_loss")
         checkpoint = tf.train.Checkpoint(model=model, optimizer=model.optimizer, completed_epoch=completed_epoch, best_val_loss=best_val_loss)
@@ -282,13 +318,8 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
             checkpoint.restore(paths["latest_checkpoint"]).assert_existing_objects_matched()
             start_epoch = int(completed_epoch.numpy())
             metadata["last_completed_epoch"] = start_epoch
-            # Recovery is saved before best-weight export, so metadata can contain
-            # a newer best loss than the checkpoint variable. Prefer metadata when
-            # the corresponding best-weight artifact exists.
-            if best_model_exists(paths["best_model_path"]):
-                saved_best_loss = metadata.get("best_val_loss")
-                if saved_best_loss is not None and math.isfinite(float(saved_best_loss)):
-                    best_val_loss.assign(float(saved_best_loss))
+            if best_val_loss.numpy() == float("inf") and metadata.get("best_val_loss") is not None:
+                best_val_loss.assign(float(metadata["best_val_loss"]))
 
         metadata["status"] = "running"
         metadata["updated_at"] = timestamp_now()
@@ -296,7 +327,7 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
         metadata["target_epochs"] = epochs
         save_json(paths["metadata_path"], metadata)
 
-        train_ds, validation_ds, _ = make_datasets(batch_size=batch_size, seed=seed)
+        train_ds, validation_ds, _ = make_datasets(batch_size=batch_size, seed=seed, training_sampling_mode=sampling_mode)
         if USE_CLASS_WEIGHTS:
             train_ds = add_sample_weights(train_ds, class_weights)
             print("Training-only class counts:", dict(enumerate(class_counts)))
@@ -305,12 +336,11 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
             print("Class weighting: none; validation remains unweighted.")
 
         callbacks = [
-            # Save the resumable state first so a later best-weight export failure
-            # cannot discard the completed epoch's model/optimizer state.
-            RecoveryCheckpointCallback(manager, completed_epoch, best_val_loss, paths["metadata_path"], metadata),
-            tf.keras.callbacks.CSVLogger(str(paths["history_path"]), append=(run_mode == "resume")),
             BestValidationWeightsCallback(paths["best_model_path"], best_val_loss, paths["metadata_path"], metadata),
+            tf.keras.callbacks.CSVLogger(str(paths["history_path"]), append=(run_mode == "resume")),
+            RecoveryCheckpointCallback(manager, completed_epoch, best_val_loss, paths["metadata_path"], metadata),
         ]
+        print(f"Training sampling mode: {sampling_mode}; cap: {sampling_info['max_training_examples_per_class']}")
         print(f"Input size: {IMAGE_HEIGHT}x{IMAGE_WIDTH}; classes: {NUM_CLASSES}")
         print("Best weights are selected using unweighted validation loss.")
         print(f"Starting at epoch {start_epoch}; total target epochs: {epochs}")
@@ -333,7 +363,7 @@ def train_fusion(run_mode, batch_size=DEFAULT_BATCH_SIZE, epochs=DEFAULT_TARGET_
         metadata["status"] = "interrupted"
         metadata["updated_at"] = timestamp_now()
         save_json(paths["metadata_path"], metadata)
-        print(f"Interrupted; resume {MODEL_NAME}/{paths['run_id']} with run_mode='resume'.")
+        print(f"Interrupted; resume {run_name}/{paths['run_id']} with run_mode='resume'.")
         raise
     except Exception as error:
         metadata["status"] = "failed"

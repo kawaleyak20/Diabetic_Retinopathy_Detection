@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #182230;
+  background: #f5f7fa;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; }
+.page { width: min(100% - 32px, 520px); margin: 48px auto; }
+.header { display: flex; align-items: center; gap: 13px; margin-bottom: 24px; }
+.mark { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 12px; background: #173f5f; color: white; font-weight: 700; }
+h1 { font-size: 24px; margin: 0 0 5px; }
+.subtitle { margin: 0; color: #657184; font-size: 14px; }
+.panel { background: white; border: 1px solid #e2e7ee; border-radius: 16px; padding: 24px; box-shadow: 0 8px 28px rgba(25, 45, 70, .06); }
+label { display: block; margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+input[type="text"], input[type="file"] { display: block; width: 100%; margin-bottom: 20px; border: 1px solid #cbd3de; border-radius: 9px; padding: 12px; background: #fff; color: inherit; font: inherit; }
+input[type="file"] { padding: 10px; }
+.hint { margin: -13px 0 20px; color: #657184; font-size: 12px; }
+button { width: 100%; border: 0; border-radius: 9px; padding: 13px 16px; background: #173f5f; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+button:hover { background: #245878; }
+.message { margin-top: 18px; padding: 12px; border-radius: 9px; font-size: 14px; }
+.error { color: #9c2525; background: #fff0f0; border: 1px solid #f4caca; }
+.result { margin-top: 22px; padding: 18px; border: 1px solid #dfe6ed; border-radius: 12px; background: #fbfcfe; }
+.result-label { margin: 0 0 12px; color: #657184; font-size: 13px; }
+.status { display: inline-block; border-radius: 99px; padding: 6px 10px; font-size: 13px; font-weight: 700; }
+.detected { color: #8a341b; background: #fff0e7; }
+.clear { color: #176345; background: #e8f7ef; }
+.result h2 { margin: 12px 0; font-size: 22px; }
+.confidence { margin: 0; color: #657184; font-size: 14px; }
+.disclaimer { margin: 16px 4px 0; color: #657184; font-size: 12px; line-height: 1.5; }
+@media (max-width: 480px) { .page { margin: 24px auto; } .panel { padding: 18px; } }

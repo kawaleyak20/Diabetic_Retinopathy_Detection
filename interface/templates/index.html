@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DR Scan Check</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="mark" aria-hidden="true">DR</div>
+      <div>
+        <h1>DR Scan Check</h1>
+        <p class="subtitle">Diabetic retinopathy stage prediction</p>
+      </div>
+    </header>
+
+    <section class="panel">
+      <form method="post" enctype="multipart/form-data">
+        <label for="patient_id">Patient ID</label>
+        <input id="patient_id" name="patient_id" type="text" value="{{ patient_id }}"
+               placeholder="Enter patient ID" autocomplete="off" required>
+
+        <label for="scan_image">Retinal scan image</label>
+        <input id="scan_image" name="scan_image" type="file"
+               accept="image/jpeg,image/png,image/webp" required>
+        <p class="hint">JPG, PNG or WEBP · Maximum 12 MB</p>
+
+        <button type="submit">Predict DR stage</button>
+      </form>
+
+      {% if error %}
+        <div class="message error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      {% if result %}
+        <section class="result" aria-live="polite">
+          <p class="result-label">Prediction for patient {{ result.patient_id }}</p>
+          {% if result.dr_detected %}
+            <div class="status detected">DR detected</div>
+            <h2>{{ result.stage }}</h2>
+          {% else %}
+            <div class="status clear">No DR detected</div>
+            <h2>{{ result.stage }}</h2>
+          {% endif %}
+          <p class="confidence">Model confidence: <strong>{{ result.confidence_percent }}%</strong></p>
+        </section>
+      {% endif %}
+    </section>
+
+    <p class="disclaimer">Academic prototype only. This prediction is not a medical diagnosis and must not replace assessment by an eye-care professional.</p>
+  </main>
+</body>
+</html>
