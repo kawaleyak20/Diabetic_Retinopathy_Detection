@@ -4,14 +4,14 @@ from pathlib import Path
 
 # Project paths. Resolve everything from this file, not from the notebook CWD.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data" / "btgraham-300"
+DATA_DIR = PROJECT_ROOT / "data" / "250K"
 MODELS_DIR = PROJECT_ROOT / "models"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
 # Dataset and fixed class order.
 EXPECTED_DATASET_NAME = "diabetic_retinopathy_detection"
-IMAGE_HEIGHT = 300
-IMAGE_WIDTH = 300
+IMAGE_HEIGHT = 512
+IMAGE_WIDTH = 512
 NUM_CLASSES = 5
 CLASS_NAMES = (
     "No DR",
