@@ -11,10 +11,11 @@
 /dataSources.local.xml
 api_token_kaggle.txt
 
-data/
+data/*
 !data/1M
 !data/250K
 !data/btgraham-300
+!data/retinopathy_solution.csv
 
 reference_papers/*
 */__pycache__/*
