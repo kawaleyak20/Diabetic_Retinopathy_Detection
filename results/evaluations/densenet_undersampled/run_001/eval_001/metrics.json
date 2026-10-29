@@ -1,0 +1,92 @@
+{
+  "model_name": "densenet_undersampled",
+  "model_display_name": "DenseNet121 (class-weighted) (fixed 70:10:20 subset; train cap 2,500/class)",
+  "run_id": "run_001",
+  "evaluation_id": "eval_001",
+  "split": "test",
+  "dataset_format": "btgraham-300",
+  "training_sampling_mode": "undersampled",
+  "training_sampling": "fixed 70:10:20 train/validation/test subset manifest",
+  "max_training_examples_per_class": 2500,
+  "training_subset_manifest_path": "manifests\\undersampling\\fixed_splits_seed42_cap2500_70-10-20.json",
+  "training_subset_sha256": "0e2d8969d3ea34a2466bf438d91634a95d8828d65d1e9d652c407e6b865b8dcb",
+  "split_manifest_sha256": "d8a125deedf71c91bc844c3cbe64e0d2a4ee144dcf604093e899a56401d7d471",
+  "training_split_manifest_sha256": "d8a125deedf71c91bc844c3cbe64e0d2a4ee144dcf604093e899a56401d7d471",
+  "legacy_training_split_metadata": false,
+  "evaluation_subset_sha256": "c2bffb37c16bd99ed478f535649d83c05b1532f9d29bcd8a64225f8199ffcff2",
+  "training_class_counts": [
+    2500,
+    2443,
+    2500,
+    873,
+    708
+  ],
+  "n_training_examples_after_sampling": 9024,
+  "n_validation_examples_after_sampling": 1289,
+  "n_test_examples_after_sampling": 2578,
+  "split_ratios": {
+    "train": 70,
+    "validation": 10,
+    "test": 20
+  },
+  "class_names": [
+    "No DR",
+    "Mild NPDR",
+    "Moderate NPDR",
+    "Severe NPDR",
+    "Proliferative DR (PDR)"
+  ],
+  "n_examples": 2578,
+  "batch_size": 16,
+  "accuracy": 0.5,
+  "macro_f1": 0.31598255690635557,
+  "weighted_f1": 0.555524097876944,
+  "quadratic_weighted_kappa": 0.348849273384758,
+  "per_class_recall": {
+    "No DR": 0.5751186083289405,
+    "Mild NPDR": 0.40217391304347827,
+    "Moderate NPDR": 0.17894736842105263,
+    "Severe NPDR": 0.3050847457627119,
+    "Proliferative DR (PDR)": 0.6551724137931034
+  },
+  "confusion_matrix": [
+    [
+      1091,
+      552,
+      114,
+      33,
+      107
+    ],
+    [
+      89,
+      74,
+      14,
+      1,
+      6
+    ],
+    [
+      131,
+      96,
+      68,
+      36,
+      49
+    ],
+    [
+      10,
+      12,
+      4,
+      18,
+      15
+    ],
+    [
+      5,
+      2,
+      4,
+      9,
+      38
+    ]
+  ],
+  "run_status_at_evaluation": "completed",
+  "run_best_validation_loss": 1.2217482328414917,
+  "evaluated_at": "2026-10-29T13:58:34+05:30"
+}

@@ -237,9 +237,14 @@ def train_densenet(
         saved_training_seed = metadata.get("seed", seed)
         saved_subset_sha256 = metadata.get("training_subset_sha256")
         expected_subset_sha256 = sampling_info.get("training_subset_sha256")
+        saved_split_manifest_sha256 = metadata.get("split_manifest_sha256")
+        expected_split_manifest_sha256 = sampling_info.get("split_manifest_sha256")
         manifest_changed = (
             sampling_mode == "undersampled"
-            and saved_subset_sha256 != expected_subset_sha256
+            and (
+                saved_subset_sha256 != expected_subset_sha256
+                or saved_split_manifest_sha256 != expected_split_manifest_sha256
+            )
         )
         if (
             saved_mode != sampling_mode
@@ -249,9 +254,9 @@ def train_densenet(
             or manifest_changed
         ):
             raise ValueError(
-                "The saved run uses a different training mode, per-class cap, sample "
-                "manifest, or training seed. Undersampled runs must use the exact same "
-                "saved manifest to resume. Use run_mode='scratch' for a new run."
+                "The saved run uses a different training mode, per-class cap, seed, or "
+                "fixed train/validation/test manifest. Undersampled runs must use the exact "
+                "same saved split manifest to resume. Use run_mode='scratch' for a new run."
             )
         metadata.update(sampling_info)
         if metadata.get("model_name") != run_name or metadata.get("architecture") != ARCHITECTURE:

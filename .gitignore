@@ -19,4 +19,4 @@ data/
 reference_papers/*
 */__pycache__/*
 .ipynb_checkpoints/
-models/*
+models/**/checkpoints/
