@@ -4,3 +4,5 @@ numpy==1.23.5
 pandas
 matplotlib
 scikit-learn
+Flask
+opencv-python

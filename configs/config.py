@@ -1,17 +1,25 @@
-"""Shared settings for the diabetic-retinopathy mini-project."""
+"""Single source of truth for shared project settings.
+
+Keep the constant names in this module stable: training scripts, evaluation,
+notebooks, and the inference interface import them directly. Change experiment
+settings here rather than duplicating values in individual files.
+"""
 
 from pathlib import Path
 
-# Project paths. Resolve everything from this file, not from the notebook CWD.
+# Project paths. Resolve these from the repository, never from notebook CWD.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_DIR = PROJECT_ROOT / "data" / "250K"
+# All current experiments and saved manifests use the btgraham-300 TFDS format.
+DATA_DIR = PROJECT_ROOT / "data" / "btgraham-300"
 MODELS_DIR = PROJECT_ROOT / "models"
 RESULTS_DIR = PROJECT_ROOT / "results"
 
-# Dataset and fixed class order.
+# Dataset identity and the fixed label order used by every model/report.
 EXPECTED_DATASET_NAME = "diabetic_retinopathy_detection"
-IMAGE_HEIGHT = 512
-IMAGE_WIDTH = 512
+# This is the model/pipeline size; it is separate from the TFDS format name.
+# Keep it aligned with completed run metadata and active-model metadata.
+IMAGE_HEIGHT = 300
+IMAGE_WIDTH = 300
 NUM_CLASSES = 5
 CLASS_NAMES = (
     "No DR",
@@ -21,20 +29,21 @@ CLASS_NAMES = (
     "Proliferative DR (PDR)",
 )
 
-# Preserve the existing TFDS splits; never make a new random split.
+# Preserve official TFDS split names; never create a new random split here.
 TRAIN_SPLIT = "train"
 VALIDATION_SPLIT = "validation"
 TEST_SPLIT = "test"
 
-# Reproducibility and input-pipeline defaults.
+# Reproducibility, memory, and training defaults.
 SEED = 42
 SHUFFLE_BUFFER = 2048
 DEFAULT_BATCH_SIZE = 4
 DEFAULT_TARGET_EPOCHS = 10
 CHECKPOINTS_TO_KEEP = None  # Keep every epoch checkpoint inside a run.
 
-# Fast fixed-subset experiment. One standalone notebook creates a single manifest
-# for all three official splits. Model scripts never perform random sampling.
+# Sampling policy. The preparation notebook creates the manifest once; model
+# scripts only consume it. Change these values only when deliberately creating
+# a new experiment and regenerating the manifest.
 TRAINING_SAMPLING_MODE = "undersampled"
 UNDERSAMPLE_MAX_PER_CLASS = 2500
 UNDERSAMPLE_SEED = SEED
@@ -45,7 +54,10 @@ UNDERSAMPLING_MANIFEST_PATH = (
     PROJECT_ROOT
     / "manifests"
     / "undersampling"
-    / f"fixed_splits_seed{UNDERSAMPLE_SEED}_cap{UNDERSAMPLE_MAX_PER_CLASS}_70-10-20.json"
+    / (
+        f"fixed_splits_seed{UNDERSAMPLE_SEED}_cap{UNDERSAMPLE_MAX_PER_CLASS}_"
+        f"{TRAIN_RATIO}-{VALIDATION_RATIO}-{TEST_RATIO}.json"
+    )
 )
 
 
@@ -70,25 +82,28 @@ def training_model_name(base_model_name, mode=None):
         return f"{base_model_name}_undersampled"
     return str(base_model_name)
 
-# Unweighted EfficientNetB0 baseline.
+# EfficientNetB0 baseline. ImageNet weights are loaded explicitly; the frozen
+# backbone keeps the experiment practical on the 4 GB GPU.
 EFFICIENTNET_VARIANT = "B0"
 EFFICIENTNET_WEIGHTS = "imagenet"
 EFFICIENTNET_BACKBONE_TRAINABLE = False
 EFFICIENTNET_DROPOUT = 0.30
 EFFICIENTNET_LEARNING_RATE = 0.001
 
-# Class-weighted DenseNet121 experiment.
+# Class-weighted DenseNet121 comparison experiment.
 DENSENET_WEIGHTS = "imagenet"
 DENSENET_BACKBONE_TRAINABLE = False
 DENSENET_DROPOUT = 0.30
 DENSENET_LEARNING_RATE = 0.001
 
-# Initial, unweighted EfficientNetB0 + DenseNet121 feature-fusion experiment.
+# Feature-fusion comparison. Both branches are frozen and concatenated after
+# global average pooling; attention is intentionally not enabled.
 FUSION_WEIGHTS = "imagenet"
 FUSION_BACKBONES_TRAINABLE = False
 FUSION_CLASS_WEIGHTED = False
 FUSION_DROPOUT = 0.30
 FUSION_LEARNING_RATE = 0.001
 
-# Training/evaluation control. Evaluation is always a separate explicit action.
+# Evaluation remains a separate explicit notebook action; no hidden evaluation
+# is triggered after training.
 AUTO_EVALUATE_AFTER_TRAINING = False

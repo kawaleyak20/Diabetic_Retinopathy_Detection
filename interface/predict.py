@@ -47,7 +47,7 @@ def _load_metadata():
     return metadata
 
 
-def _build_model(model_key):
+def _build_model(model_key, input_size):
     # Register the project's Windows Conda DLL setup before importing TensorFlow.
     from configs import tensorflow_setup as _tensorflow_setup  # noqa: F401
     import tensorflow as tf
@@ -56,22 +56,23 @@ def _build_model(model_key):
 
     # Build the same architecture with weights=None; the trained weights file
     # supplies the backbone and classifier weights without downloading ImageNet.
+    input_shape = tuple(int(value) for value in input_size[:2])
     if model_key in {"efficientnet", "efficientnet_weighted"}:
         from scripts.train_efficientnet import build_efficientnet_model
-        model = build_efficientnet_model(weights=None)
+        model = build_efficientnet_model(weights=None, input_size=input_shape)
     elif model_key == "densenet":
         from scripts.train_densenet import build_densenet_model
-        model = build_densenet_model(weights=None)
+        model = build_densenet_model(weights=None, input_size=input_shape)
     else:
         from scripts.train_fusion import build_fusion_model
-        model = build_fusion_model(weights=None)
+        model = build_fusion_model(weights=None, input_size=input_shape)
 
     return model
 
 
 @lru_cache(maxsize=1)
-def _get_model(weights_path, model_key):
-    model = _build_model(model_key)
+def _get_model(weights_path, model_key, input_size):
+    model = _build_model(model_key, input_size)
     model.load_weights(weights_path)
     return model
 
@@ -112,13 +113,23 @@ def preprocess_scan(image_bytes, image_size=300):
 
 def predict_scan(image_bytes):
     metadata = _load_metadata()
-    image_size = int(metadata.get("input_size", [300, 300, 3])[0])
+    input_size = metadata.get("input_size", [300, 300, 3])
+    if (
+        not isinstance(input_size, list)
+        or len(input_size) != 3
+        or any(int(value) < 1 for value in input_size)
+        or int(input_size[2]) != 3
+    ):
+        raise ValueError("Active model metadata must define input_size as [height, width, 3].")
+    image_size = (int(input_size[0]), int(input_size[1]))
     class_names = metadata.get("class_names", DEFAULT_CLASS_NAMES)
     if len(class_names) != 5:
         raise ValueError("Active model metadata must define the five DR class names.")
 
     image_batch = preprocess_scan(image_bytes, image_size=image_size)
-    model = _get_model(metadata["_resolved_weights_path"], metadata["model_key"])
+    model = _get_model(
+        metadata["_resolved_weights_path"], metadata["model_key"], input_size
+    )
     probabilities = np.asarray(model.predict(image_batch, verbose=0))[0]
     predicted_index = int(np.argmax(probabilities))
     predicted_stage = class_names[predicted_index]

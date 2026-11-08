@@ -41,7 +41,7 @@ from scripts.utils import (
     timestamp_now,
 )
 
-def build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS):
+def build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS, input_size=None):
     """Create a frozen EfficientNetB0 feature extractor and five-class head.
 
     Keras EfficientNet includes its own input rescaling, so pass the loader's
@@ -53,14 +53,15 @@ def build_efficientnet_model(weights=EFFICIENTNET_WEIGHTS):
             "builder deliberately before changing EFFICIENTNET_VARIANT."
         )
 
+    height, width = input_size or (IMAGE_HEIGHT, IMAGE_WIDTH)
     backbone = tf.keras.applications.EfficientNetB0(
         include_top=False,
         weights=weights,
-        input_shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3),
+        input_shape=(int(height), int(width), 3),
     )
     backbone.trainable = EFFICIENTNET_BACKBONE_TRAINABLE
 
-    inputs = tf.keras.Input(shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3), name="retinal_image")
+    inputs = tf.keras.Input(shape=(int(height), int(width), 3), name="retinal_image")
     features = backbone(inputs, training=False)
     features = tf.keras.layers.GlobalAveragePooling2D(name="global_average_pooling")(features)
     features = tf.keras.layers.Dropout(EFFICIENTNET_DROPOUT, name="head_dropout")(features)

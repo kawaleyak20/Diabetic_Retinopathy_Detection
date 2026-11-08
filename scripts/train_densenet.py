@@ -48,16 +48,17 @@ ARCHITECTURE = "DenseNet121"
 USE_CLASS_WEIGHTS = True
 
 
-def build_densenet_model(weights=DENSENET_WEIGHTS):
+def build_densenet_model(weights=DENSENET_WEIGHTS, input_size=None):
     """Build DenseNet121 with its ImageNet preprocessing inside the model."""
+    height, width = input_size or (IMAGE_HEIGHT, IMAGE_WIDTH)
     backbone = tf.keras.applications.DenseNet121(
         include_top=False,
         weights=weights,
-        input_shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3),
+        input_shape=(int(height), int(width), 3),
     )
     backbone.trainable = DENSENET_BACKBONE_TRAINABLE
 
-    inputs = tf.keras.Input(shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3), name="retinal_image")
+    inputs = tf.keras.Input(shape=(int(height), int(width), 3), name="retinal_image")
     processed = tf.keras.layers.Lambda(
         tf.keras.applications.densenet.preprocess_input,
         name="densenet_preprocessing",

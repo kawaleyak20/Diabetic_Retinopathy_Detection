@@ -1,7 +1,7 @@
 {
   "model_key": "efficientnet_weighted",
   "run_id": "run_001",
-  "weights_path": "D:/M L/Diabetic_Retinopathy_Detection_mini_project/models/efficientnet_weighted_undersampled/runs/run_001/best_model.weights.h5",
+  "weights_path": "models/efficientnet_weighted_undersampled/runs/run_001/best_model.weights.h5",
   "architecture": "EfficientNetB0",
   "input_size": [300, 300, 3],
   "input_preprocessing": "btgraham_style_crop_contrast_resize",

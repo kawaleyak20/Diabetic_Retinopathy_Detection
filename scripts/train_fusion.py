@@ -51,25 +51,26 @@ USE_CLASS_WEIGHTS = FUSION_CLASS_WEIGHTED
 FUSION_METHOD = "concatenate global-average-pooled branch features"
 
 
-def build_fusion_model(weights=FUSION_WEIGHTS):
+def build_fusion_model(weights=FUSION_WEIGHTS, input_size=None):
     """Fuse the two frozen backbones' pooled features; this is not attention fusion."""
     if EFFICIENTNET_VARIANT != "B0":
         raise ValueError("This fusion implementation uses EfficientNetB0; update the architecture deliberately before changing the config.")
 
+    height, width = input_size or (IMAGE_HEIGHT, IMAGE_WIDTH)
     efficientnet = tf.keras.applications.EfficientNetB0(
         include_top=False,
         weights=weights,
-        input_shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3),
+        input_shape=(int(height), int(width), 3),
     )
     densenet = tf.keras.applications.DenseNet121(
         include_top=False,
         weights=weights,
-        input_shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3),
+        input_shape=(int(height), int(width), 3),
     )
     efficientnet.trainable = FUSION_BACKBONES_TRAINABLE
     densenet.trainable = FUSION_BACKBONES_TRAINABLE
 
-    inputs = tf.keras.Input(shape=(IMAGE_HEIGHT, IMAGE_WIDTH, 3), name="retinal_image")
+    inputs = tf.keras.Input(shape=(int(height), int(width), 3), name="retinal_image")
     efficientnet_features = efficientnet(inputs, training=False)
     efficientnet_features = tf.keras.layers.GlobalAveragePooling2D(name="efficientnet_global_pool")(efficientnet_features)
 
